@@ -1,0 +1,16 @@
+{
+  "model_name": "clause_risk_classifier",
+  "version": "1.0",
+  "algorithm": "TF-IDF + Logistic Regression",
+  "training_samples": 55,
+  "classes": [
+    "critical",
+    "high",
+    "low",
+    "medium"
+  ],
+  "accuracy": 0.5455,
+  "cv_mean": 0.5809,
+  "cv_std": 0.1407,
+  "note": "Trained on synthetic Indian legal data. Production accuracy requires real labeled data."
+}
