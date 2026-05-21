@@ -116,21 +116,28 @@ Respond ONLY with valid JSON:
 
 
 def answer_legal_question(question: str, language: str = "English", context: str = "") -> str:
-    """Answer any general legal question — the core Q&A feature."""
+    """Answer any general legal question — fast with caching + mock fallback."""
+    # 1. Check mock first — instant, no API call
+    mock_answer = _mock_legal_answer(question)
+    is_generic = "Could you provide more details" in mock_answer or "General principles:" in mock_answer
+    if not is_generic:
+        return mock_answer + DISCLAIMER
+
+    # 2. Check Redis cache — instant if cached
     cache_key = _make_cache_key(question + context[:100], "legal_qa", settings.AI_PROVIDER)
     cached = cache_get(cache_key)
     if cached and isinstance(cached, str):
         return cached
 
-    prompt = f"""A user in India has asked this legal question:
-
-"{question}"
-
-{f'Additional context: {context}' if context else ''}
-
-Please answer in {language}. Explain clearly and helpfully. If this is about a specific legal situation, explain the general legal principles that apply in India, what their rights typically are, what process they should follow, and what questions to ask a lawyer.
-
-Be thorough but clear. Use simple language. Include relevant Indian laws or acts where applicable."""
+    # 3. Fast OpenAI call with shorter prompt
+    prompt = f"""Indian legal question from user: "{question}"
+{"Context: " + context if context else ""}
+Respond in {language} in 200-300 words:
+- Direct answer to the question
+- Relevant Indian law or act name
+- 2-3 practical steps to take
+- Helpline number if applicable
+Be specific and concise."""
 
     result = _call_provider_text(prompt, GENERAL_LEGAL_SYSTEM_PROMPT)
     if result is None:
@@ -332,6 +339,11 @@ def _mock_document_analysis(doc_type: str, findings: list) -> Dict:
 
 def _mock_legal_answer(question: str) -> str:
     q_lower = question.lower()
+
+    # Handle "Tell me more about: X" from Know Your Rights Ask AI button
+    if "tell me more about:" in q_lower:
+        topic = question.lower().replace("tell me more about:", "").strip()
+        return _explain_specific_right(topic)
 
     if any(w in q_lower for w in ["tenant", "rent", "landlord", "eviction", "deposit"]):
         return """**Tenant Rights in India**
@@ -710,3 +722,311 @@ Indian law provides protections and remedies for most legal situations that peop
 For a more specific answer, please provide more details about your situation. I can explain the relevant laws, your rights, and the typical process for your type of issue.
 
 This is general legal education, not legal advice for your specific situation."""
+
+
+def _explain_specific_right(topic: str) -> str:
+    """Give specific answer for Know Your Rights 'Ask AI' button."""
+
+    RIGHTS_ANSWERS = {
+        "right to a written agreement": """**Right to a Written Agreement — Tenant Rights**
+
+Under Indian law, every tenant has the right to a proper written rental agreement before paying any deposit or rent.
+
+**What this right means:**
+- You should NEVER pay rent or deposit without a signed written agreement
+- Verbal agreements are legally valid but very difficult to enforce in court
+- A written agreement protects both you and the landlord
+
+**What your written agreement must contain:**
+- Names of landlord and tenant
+- Property address and description
+- Monthly rent amount and due date
+- Security deposit amount and refund conditions
+- Lock-in period and notice period
+- Maintenance responsibilities
+- Termination conditions
+
+**Registration requirement:**
+- Agreements above 11 months MUST be registered at the Sub-Registrar office
+- Unregistered agreements above 11 months cannot be produced as evidence in court
+- Registration cost: typically 1% of total rent + deposit (varies by state)
+
+**If landlord refuses to give written agreement:**
+- Do not pay any deposit or advance
+- A landlord who refuses written documentation is a red flag
+- You can approach Consumer Forum or civil court for relief
+
+**Practical tip**: Always get the agreement reviewed by a lawyer before signing, especially if the deposit is large.""",
+
+        "security deposit protection": """**Security Deposit Protection — Tenant Rights**
+
+Your security deposit is your money and is legally protected in India.
+
+**Legal position:**
+- Security deposit is refundable — it is NOT income for the landlord
+- Landlord can only deduct legitimate damages from deposit
+- Normal wear and tear CANNOT be deducted from deposit
+
+**Refund timeline:**
+- Typically 30-60 days after vacating and handing over keys
+- Your agreement should specify the exact timeline
+- If not specified, courts expect refund within reasonable time (30 days)
+
+**What landlord can deduct:**
+✅ Actual damage caused by tenant beyond normal wear
+✅ Unpaid rent or utility bills
+✅ Cost of repairs specifically caused by tenant misuse
+
+**What landlord CANNOT deduct:**
+❌ Normal wear and tear (paint fading, minor marks)
+❌ Pre-existing damage at move-in
+❌ Landlord's renovation or upgrade costs
+
+**If landlord wrongfully withholds deposit:**
+1. Send registered letter demanding refund within 15 days
+2. File complaint at District Consumer Forum (free, no lawyer needed)
+3. File civil suit for recovery with interest
+4. Approach State Rent Control Court if applicable
+
+**Important**: Document the property condition with photos/video at move-in AND move-out with timestamps.""",
+
+        "notice before eviction": """**Notice Before Eviction — Tenant Rights**
+
+A landlord CANNOT evict you without proper legal notice and process in India.
+
+**Legal protection:**
+- Transfer of Property Act, 1882 protects tenants from arbitrary eviction
+- State Rent Control Acts provide additional protection in many cities
+- Immediate eviction without notice is illegal
+
+**Minimum notice requirements:**
+- As per agreement: usually 1-3 months written notice
+- If not in agreement: courts typically require 15-30 days minimum
+- For month-to-month tenancy: 15 days notice is standard
+
+**Legal eviction grounds (landlord must prove):**
+✅ Non-payment of rent for extended period
+✅ Tenant has sublet without permission
+✅ Property required for landlord's personal use
+✅ Tenant has damaged the property
+✅ Agreement period has expired
+
+**What to do if landlord threatens eviction:**
+1. Do NOT vacate under pressure alone — know your rights
+2. Ask for written eviction notice
+3. Landlord MUST go to Rent Control Court for eviction order
+4. You have right to contest eviction in court
+5. Police CANNOT evict you without court order
+
+**Emergency/illegal eviction** (landlord changes locks, removes belongings):
+- This is ILLEGAL — file FIR immediately
+- Approach Rent Control Court for urgent relief
+- You can claim damages for illegal eviction""",
+
+        "right to peaceful enjoyment": """**Right to Peaceful Enjoyment — Tenant Rights**
+
+As a tenant, you have the right to use your rented home without interference from the landlord.
+
+**What this right covers:**
+- Landlord cannot enter your home without prior notice (typically 24-48 hours)
+- Landlord cannot harass you, threaten you, or cut off utilities
+- Landlord cannot conduct surprise inspections without consent
+- You have right to privacy in your own home
+
+**Landlord entry rules:**
+- Must give advance notice (24 hours is standard)
+- Entry only at reasonable hours
+- Emergency entry is allowed only for genuine emergencies (water leak, fire, etc.)
+- You can refuse entry if proper notice not given
+
+**What constitutes harassment by landlord:**
+- Repeated unannounced visits
+- Cutting off electricity, water, or gas to force vacation
+- Removing doors, windows, or fixtures
+- Threatening or abusing tenant
+- Locking out tenant from property
+
+**All of these are ILLEGAL and you can:**
+1. File police complaint for harassment
+2. File case in Rent Control Court
+3. Claim damages for interference with peaceful possession
+4. In extreme cases — file criminal complaint under IPC""",
+
+        "right to safety": """**Right to Safety — Consumer Rights**
+
+Under the Consumer Protection Act, 2019, you have the right to protection from goods and services that are hazardous to life and property.
+
+**Key safety rights:**
+- Products must meet safety standards before being sold
+- You can demand replacement or refund for unsafe products
+- Manufacturers are liable for defective products that cause harm
+- Services must be performed with reasonable care and skill
+
+**Product safety:**
+- BIS (Bureau of Indian Standards) mark indicates safety compliance
+- ISI mark for electrical appliances, helmets, etc.
+- Products causing injury = manufacturer liability
+
+**How to claim compensation:**
+1. Document the defect with photos/videos
+2. Keep purchase receipt and packaging
+3. File complaint with manufacturer/seller first
+4. If no resolution — file at District Consumer Forum
+
+**Consumer helpline: 1800-11-4000 (free)**""",
+
+        "right to information": """**Right to Information — Consumer Rights**
+
+You have the right to complete information about any product or service before purchasing.
+
+**What sellers must disclose:**
+- Complete price including all taxes and charges
+- Quality, quantity, and composition of goods
+- Manufacturing date and expiry date (for food/medicine)
+- Terms and conditions of service
+- Return and refund policy
+- Contact details for complaints
+
+**For e-commerce (online shopping):**
+- Seller name, address, and contact must be displayed
+- Return policy must be clearly stated
+- No hidden charges — total price must be shown upfront
+- Delivery timeline must be mentioned
+
+**If information was misleading:**
+- You can return the product and claim full refund
+- File complaint at consumerhelpline.gov.in
+- Seller can be penalized for misleading advertising under ASCI guidelines
+
+**For financial products:** SEBI and RBI mandate complete disclosure of all fees, risks, and terms.""",
+
+        "right to privacy online": """**Right to Privacy Online — Digital Rights**
+
+The Digital Personal Data Protection Act, 2023 (DPDPA) gives you strong rights over your personal data.
+
+**Your key digital privacy rights:**
+1. **Right to consent** — Companies must get your explicit consent before collecting data
+2. **Right to know** — You can ask what data a company has collected about you
+3. **Right to correction** — You can ask companies to correct inaccurate data
+4. **Right to erasure** — You can ask companies to delete your data
+5. **Right to grievance** — Every company must have a grievance officer
+
+**What companies CANNOT do:**
+- Collect data without clear consent
+- Use data for purposes beyond what was consented to
+- Share your data with third parties without consent
+- Retain data longer than necessary
+
+**If your privacy is violated:**
+1. File complaint with the company's grievance officer first
+2. Escalate to Data Protection Board of India (once operational)
+3. For cybercrime — file at cybercrime.gov.in
+4. Cyber helpline: **1930**
+
+**Practical tips:**
+- Read privacy policies before signing up
+- Review app permissions regularly
+- Use strong passwords and 2FA
+- Don't share OTPs or passwords with anyone""",
+
+        "protection from harassment": """**Protection from Workplace Harassment — Employee Rights**
+
+The Sexual Harassment of Women at Workplace Act, 2013 (POSH Act) protects employees from harassment.
+
+**What is sexual harassment at workplace:**
+- Unwelcome physical contact or advances
+- Demand or request for sexual favours
+- Sexually coloured remarks
+- Showing pornography
+- Any other unwelcome physical, verbal or non-verbal conduct of a sexual nature
+
+**Your rights under POSH Act:**
+- Every employer with 10+ employees MUST have an Internal Complaints Committee (ICC)
+- You can file complaint with ICC within 3 months of incident
+- Inquiry must be completed within 90 days
+- You can request transfer during inquiry
+- Your identity is kept confidential
+
+**What to do if harassed:**
+1. Document all incidents with dates, times, and witnesses
+2. File written complaint with ICC
+3. If no ICC exists — file with Local Complaints Committee (district level)
+4. Can file criminal complaint under IPC Section 354A simultaneously
+
+**Other workplace harassment:**
+- Bullying, victimization, discrimination are also grounds for complaint
+- File with Labour Commissioner for general workplace harassment
+- Approach National Human Rights Commission for serious violations""",
+
+        "gratuity after 5 years": """**Gratuity Rights — Employee Rights**
+
+Gratuity is a statutory payment you are entitled to after completing 5 years of continuous service.
+
+**Gratuity calculation formula:**
+```
+Gratuity = (Last drawn salary × 15 × Years of service) ÷ 26
+```
+
+**Example:**
+- Last salary: ₹50,000/month
+- Service: 8 years
+- Gratuity = (50,000 × 15 × 8) ÷ 26 = **₹2,30,769**
+
+**Important rules:**
+- Minimum 5 years continuous service required
+- Payable on resignation, retirement, death, or disablement
+- Must be paid within 30 days of becoming payable
+- Tax-free up to ₹20 lakh (as of 2023)
+- Company cannot deny gratuity if eligible
+
+**If company refuses gratuity:**
+1. Send written demand notice to employer
+2. File application before Controlling Authority (Labour Commissioner)
+3. Authority can award gratuity + 10% simple interest for delay
+4. Criminal prosecution possible for willful non-payment
+
+**If you die or become disabled before 5 years:**
+Nominee/family still entitled to proportional gratuity""",
+    }
+
+    # Find best matching answer
+    for key, answer in RIGHTS_ANSWERS.items():
+        if any(word in topic for word in key.split()):
+            return answer
+
+    # If topic contains known keywords
+    if any(w in topic for w in ["tenant", "rent", "landlord", "evict", "deposit", "lease"]):
+        return _mock_legal_answer("tenant rights in india")
+    if any(w in topic for w in ["employee", "salary", "employer", "job", "work", "pf", "gratuity", "termination"]):
+        return _mock_legal_answer("employee rights india")
+    if any(w in topic for w in ["consumer", "product", "refund", "defective", "service", "ecommerce"]):
+        return _mock_legal_answer("consumer complaint india")
+    if any(w in topic for w in ["privacy", "cyber", "digital", "data", "online", "hack", "social media"]):
+        return _mock_legal_answer("cybercrime india")
+
+    # Generic but helpful fallback for unknown rights topics
+    return f"""**{topic.title()}**
+
+This is an important legal right under Indian law. Here is what you need to know:
+
+**General legal framework:**
+Indian law provides comprehensive protections for citizens across all areas. The specific rights related to "{topic}" are governed by applicable Acts and Regulations.
+
+**Your key protections:**
+- You have the right to fair treatment under Indian law
+- Violations of your rights can be reported to appropriate authorities
+- Free legal aid is available if you cannot afford a lawyer
+
+**How to enforce this right:**
+1. Document any violation with evidence (photos, messages, receipts)
+2. Send a formal written complaint to the concerned party
+3. Approach the relevant regulatory authority or court
+4. Contact NALSA helpline **15100** for free legal guidance
+
+**Free resources:**
+- NALSA Helpline: 15100
+- National Consumer Helpline: 1800-11-4000
+- Cybercrime: 1930
+- ecourts.gov.in for court-related matters
+
+Would you like me to explain any specific aspect of this right in more detail?"""
