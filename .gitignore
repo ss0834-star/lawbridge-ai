@@ -8,3 +8,7 @@ node_modules/
 .DS_Store
 *.zip
 uploads/
+backend/app/ml/models/*.pkl
+backend/app/ml/models/*.bin
+backend/app/ml/models/*.safetensors
+backend/app/ml/models/inlegalbert_finetuned/
