@@ -140,35 +140,27 @@ def run_rule_analysis(text: str, doc_type: str) -> Dict:
 
 
 def classify_clause_risk(text: str) -> Dict:
-    # Try trained ML model first
-    if _clause_model is not None and _clause_le is not None:
-        try:
-            pred = _clause_model.predict([text[:500]])[0]
-            proba = _clause_model.predict_proba([text[:500]])[0]
-            confidence = float(max(proba))
-            risk_level = str(_clause_le.inverse_transform([pred])[0])
-            return {
-                "risk_level": risk_level,
-                "confidence": round(min(0.95, confidence), 2),
-                "matched_indicators": [],
-                "reason": f"ML model prediction: {risk_level} risk (confidence: {confidence:.0%})",
-                "source": "ml_model"
-            }
-        except Exception as e:
-            logger.warning(f"ML clause classification failed: {e}")
-    # Fallback: rule-based
+    """Classify clause risk using best available model."""
+    try:
+        from app.ml.ml_service import classify_clause_risk as ml_classify
+        return ml_classify(text)
+    except Exception as e:
+        logger.warning(f"ML service failed, using rule-based: {e}")
+    # Pure rule-based fallback
     text_lower = text.lower()
     INDICATORS = {
-        "critical": ["criminal complaint", "fir", "arrest", "without any notice immediately evict"],
-        "high": ["terminate without cause", "no notice", "forfeit", "non-compete", "bond amount", "guarantor", "prepayment penalty", "unlimited liability", "moonlighting", "at will"],
-        "medium": ["lock-in", "notice period", "escalation", "maintenance charges", "arbitration", "ip ownership", "confidential", "relocation", "interest rate"],
-        "low": ["renewal", "extension", "amendment", "standard terms", "force majeure", "governing law"],
+        "critical": ["criminal complaint","fir","arrest","criminal action"],
+        "high": ["terminate without cause","non-compete","bond amount","guarantor","moonlighting","at will"],
+        "medium": ["lock-in","notice period","escalation","arbitration","ip ownership"],
+        "low": ["renewal","force majeure","governing law","good faith"],
     }
-    for level in ["critical", "high", "medium", "low"]:
+    for level in ["critical","high","medium","low"]:
         matches = [ind for ind in INDICATORS[level] if ind in text_lower]
         if matches:
-            return {"risk_level": level, "confidence": min(0.95, 0.6 + len(matches)*0.1), "matched_indicators": matches[:3], "reason": f"Contains {level}-risk language: {', '.join(matches[:2])}", "source": "rule_based"}
-    return {"risk_level": "low", "confidence": 0.5, "matched_indicators": [], "reason": "No significant risk indicators detected", "source": "rule_based"}
+            return {"risk_level": level, "confidence": min(0.95, 0.6+len(matches)*0.1),
+                    "matched_indicators": matches[:3], "reason": f"Rule: {', '.join(matches[:2])}", "source": "rule_based"}
+    return {"risk_level": "low", "confidence": 0.5, "matched_indicators": [],
+            "reason": "No significant risk indicators", "source": "rule_based"}
 
 
 def extract_clauses(text: str) -> List[Dict]:
