@@ -170,10 +170,10 @@ def extract_clauses(text: str) -> List[Dict]:
         r = classify_clause_risk(para)
         clauses.append({
             "clause_number": i+1, "title": f"Section {i+1}",
-            "original_text": para[:500], "risk_level": r["risk_level"],
-            "confidence_score": r["confidence"], "risk_reason": r["reason"],
-            "keywords": r["matched_indicators"],
-            "lawyer_review_recommended": r["risk_level"] in ["high", "critical"]
+            "original_text": para[:500], "risk_level": r.get("risk_level", "low"),
+            "confidence_score": r.get("confidence", 0.5), "risk_reason": r.get("reason", ""),
+            "keywords": r.get("matched_indicators", []),
+            "lawyer_review_recommended": r.get("risk_level", "low") in ["high", "critical"]
         })
     return clauses
 
