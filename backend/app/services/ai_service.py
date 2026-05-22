@@ -117,7 +117,12 @@ Respond ONLY with valid JSON:
 
 def answer_legal_question(question: str, language: str = "English", context: str = "") -> str:
     """Answer any general legal question — fast with caching + mock fallback."""
-    # 1. Check mock first — instant, no API call
+    # 1. "Tell me more about:" ALWAYS goes to specific rights handler — no keyword matching
+    if "tell me more about:" in question.lower():
+        topic = question.lower().replace("tell me more about:", "").strip()
+        return _explain_specific_right(topic) + DISCLAIMER
+
+    # 2. Check mock first — instant, no API call
     mock_answer = _mock_legal_answer(question)
     is_generic = "Could you provide more details" in mock_answer or "General principles:" in mock_answer
     if not is_generic:
@@ -725,240 +730,196 @@ This is general legal education, not legal advice for your specific situation.""
 
 
 def _explain_specific_right(topic: str) -> str:
-    """Give specific answer for Know Your Rights 'Ask AI' button."""
+    """Give specific answer for Know Your Rights Ask AI button."""
+    t = topic.lower().strip()
 
-    RIGHTS_ANSWERS = {
-        "right to a written agreement": """**Right to a Written Agreement — Tenant Rights**
+    # Tenant Rights
+    if "written agreement" in t or "written" in t and "agreement" in t:
+        return """**Right to a Written Agreement — Tenant Rights**
 
 Under Indian law, every tenant has the right to a proper written rental agreement before paying any deposit or rent.
 
 **What this right means:**
 - You should NEVER pay rent or deposit without a signed written agreement
-- Verbal agreements are legally valid but very difficult to enforce in court
+- Verbal agreements are hard to enforce in court
 - A written agreement protects both you and the landlord
 
 **What your written agreement must contain:**
-- Names of landlord and tenant
-- Property address and description
+- Names of landlord and tenant, property address
 - Monthly rent amount and due date
 - Security deposit amount and refund conditions
-- Lock-in period and notice period
-- Maintenance responsibilities
-- Termination conditions
+- Lock-in period and notice period for both parties
+- Maintenance responsibilities and termination conditions
 
 **Registration requirement:**
 - Agreements above 11 months MUST be registered at the Sub-Registrar office
-- Unregistered agreements above 11 months cannot be produced as evidence in court
 - Registration cost: typically 1% of total rent + deposit (varies by state)
 
-**If landlord refuses to give written agreement:**
-- Do not pay any deposit or advance
-- A landlord who refuses written documentation is a red flag
-- You can approach Consumer Forum or civil court for relief
+**If landlord refuses written agreement:** Do not pay any deposit. Approach Consumer Forum or civil court.
 
-**Practical tip**: Always get the agreement reviewed by a lawyer before signing, especially if the deposit is large.""",
+**Practical tip**: Always get the agreement reviewed by a lawyer before signing."""
 
-        "security deposit protection": """**Security Deposit Protection — Tenant Rights**
+    if "security deposit" in t or "deposit protection" in t:
+        return """**Security Deposit Protection — Tenant Rights**
 
 Your security deposit is your money and is legally protected in India.
 
-**Legal position:**
-- Security deposit is refundable — it is NOT income for the landlord
-- Landlord can only deduct legitimate damages from deposit
-- Normal wear and tear CANNOT be deducted from deposit
+**Refund timeline:** Typically 30-60 days after vacating and handing over keys.
 
-**Refund timeline:**
-- Typically 30-60 days after vacating and handing over keys
-- Your agreement should specify the exact timeline
-- If not specified, courts expect refund within reasonable time (30 days)
-
-**What landlord can deduct:**
-✅ Actual damage caused by tenant beyond normal wear
-✅ Unpaid rent or utility bills
-✅ Cost of repairs specifically caused by tenant misuse
+**What landlord CAN deduct:**
+- Actual damage caused by tenant beyond normal wear
+- Unpaid rent or utility bills
 
 **What landlord CANNOT deduct:**
-❌ Normal wear and tear (paint fading, minor marks)
-❌ Pre-existing damage at move-in
-❌ Landlord's renovation or upgrade costs
+- Normal wear and tear (paint fading, minor marks)
+- Pre-existing damage at move-in
+- Landlord's renovation or upgrade costs
 
 **If landlord wrongfully withholds deposit:**
 1. Send registered letter demanding refund within 15 days
 2. File complaint at District Consumer Forum (free, no lawyer needed)
 3. File civil suit for recovery with interest
-4. Approach State Rent Control Court if applicable
 
-**Important**: Document the property condition with photos/video at move-in AND move-out with timestamps.""",
+**Important**: Document property condition with photos/video at move-in AND move-out."""
 
-        "notice before eviction": """**Notice Before Eviction — Tenant Rights**
+    if "eviction" in t or "notice before" in t:
+        return """**Notice Before Eviction — Tenant Rights**
 
-A landlord CANNOT evict you without proper legal notice and process in India.
-
-**Legal protection:**
-- Transfer of Property Act, 1882 protects tenants from arbitrary eviction
-- State Rent Control Acts provide additional protection in many cities
-- Immediate eviction without notice is illegal
+A landlord CANNOT evict you without proper legal notice in India.
 
 **Minimum notice requirements:**
 - As per agreement: usually 1-3 months written notice
-- If not in agreement: courts typically require 15-30 days minimum
 - For month-to-month tenancy: 15 days notice is standard
 
 **Legal eviction grounds (landlord must prove):**
-✅ Non-payment of rent for extended period
-✅ Tenant has sublet without permission
-✅ Property required for landlord's personal use
-✅ Tenant has damaged the property
-✅ Agreement period has expired
+- Non-payment of rent for extended period
+- Tenant has sublet without permission
+- Property required for landlord's personal use
+- Agreement period has expired
 
 **What to do if landlord threatens eviction:**
-1. Do NOT vacate under pressure alone — know your rights
+1. Do NOT vacate under pressure alone
 2. Ask for written eviction notice
 3. Landlord MUST go to Rent Control Court for eviction order
-4. You have right to contest eviction in court
-5. Police CANNOT evict you without court order
+4. Police CANNOT evict you without court order
 
-**Emergency/illegal eviction** (landlord changes locks, removes belongings):
-- This is ILLEGAL — file FIR immediately
-- Approach Rent Control Court for urgent relief
-- You can claim damages for illegal eviction""",
+**Emergency/illegal eviction** (landlord changes locks): This is ILLEGAL — file FIR immediately."""
 
-        "right to peaceful enjoyment": """**Right to Peaceful Enjoyment — Tenant Rights**
+    if "peaceful" in t or "enjoyment" in t:
+        return """**Right to Peaceful Enjoyment — Tenant Rights**
 
 As a tenant, you have the right to use your rented home without interference from the landlord.
 
-**What this right covers:**
-- Landlord cannot enter your home without prior notice (typically 24-48 hours)
-- Landlord cannot harass you, threaten you, or cut off utilities
-- Landlord cannot conduct surprise inspections without consent
-- You have right to privacy in your own home
-
 **Landlord entry rules:**
-- Must give advance notice (24 hours is standard)
+- Must give 24-48 hours advance notice
 - Entry only at reasonable hours
-- Emergency entry is allowed only for genuine emergencies (water leak, fire, etc.)
-- You can refuse entry if proper notice not given
+- Emergency entry allowed only for genuine emergencies
 
-**What constitutes harassment by landlord:**
+**What constitutes harassment by landlord (all ILLEGAL):**
 - Repeated unannounced visits
 - Cutting off electricity, water, or gas to force vacation
 - Removing doors, windows, or fixtures
 - Threatening or abusing tenant
-- Locking out tenant from property
 
-**All of these are ILLEGAL and you can:**
+**If harassed:**
 1. File police complaint for harassment
 2. File case in Rent Control Court
-3. Claim damages for interference with peaceful possession
-4. In extreme cases — file criminal complaint under IPC""",
+3. Claim damages for interference with peaceful possession"""
 
-        "right to safety": """**Right to Safety — Consumer Rights**
+    if "receipt" in t:
+        return """**Right to Receipt for All Payments — Tenant Rights**
 
-Under the Consumer Protection Act, 2019, you have the right to protection from goods and services that are hazardous to life and property.
+As a tenant, you have the right to a written receipt for every payment you make.
 
-**Key safety rights:**
-- Products must meet safety standards before being sold
-- You can demand replacement or refund for unsafe products
-- Manufacturers are liable for defective products that cause harm
-- Services must be performed with reasonable care and skill
+**What a valid rent receipt must contain:**
+- Date of payment, amount paid, period covered
+- Property address
+- Landlord's signature, name, and PAN (for rent above ₹1 lakh/year)
 
-**Product safety:**
-- BIS (Bureau of Indian Standards) mark indicates safety compliance
-- ISI mark for electrical appliances, helmets, etc.
-- Products causing injury = manufacturer liability
+**If landlord refuses to give receipt:**
+- Send rent via bank transfer/cheque — creates automatic paper trail
+- You can approach Rent Control Court if landlord persistently refuses
 
-**How to claim compensation:**
-1. Document the defect with photos/videos
-2. Keep purchase receipt and packaging
-3. File complaint with manufacturer/seller first
-4. If no resolution — file at District Consumer Forum
+**For HRA tax benefit:**
+- Receipts required for rent above ₹3,000/month
+- Keep all receipts for minimum 6 years"""
 
-**Consumer helpline: 1800-11-4000 (free)**""",
+    if "habitable" in t or "condition" in t and ("property" in t or "house" in t):
+        return """**Right to Habitable Condition — Tenant Rights**
 
-        "right to information": """**Right to Information — Consumer Rights**
+You have the right to a property that is safe, liveable, and in good repair.
 
-You have the right to complete information about any product or service before purchasing.
+**Landlord's obligations:**
+- Must carry out major structural repairs
+- Must ensure building common areas are safe
+- Cannot cut off essential services (water/electricity)
 
-**What sellers must disclose:**
-- Complete price including all taxes and charges
-- Quality, quantity, and composition of goods
-- Manufacturing date and expiry date (for food/medicine)
-- Terms and conditions of service
-- Return and refund policy
-- Contact details for complaints
+**If landlord refuses to maintain property:**
+1. Send written notice identifying specific issues
+2. Give 15-30 days to repair
+3. File complaint with local municipal authority
+4. Approach Rent Control Court for relief
 
-**For e-commerce (online shopping):**
-- Seller name, address, and contact must be displayed
-- Return policy must be clearly stated
-- No hidden charges — total price must be shown upfront
-- Delivery timeline must be mentioned
+**Cutting off utilities is ILLEGAL** — file police complaint immediately."""
 
-**If information was misleading:**
-- You can return the product and claim full refund
-- File complaint at consumerhelpline.gov.in
-- Seller can be penalized for misleading advertising under ASCI guidelines
+    # Employee Rights
+    if "appointment letter" in t or "appointment" in t and "letter" in t:
+        return """**Right to Written Appointment Letter — Employee Rights**
 
-**For financial products:** SEBI and RBI mandate complete disclosure of all fees, risks, and terms.""",
+Every employee has the right to a written appointment letter from their employer.
 
-        "right to privacy online": """**Right to Privacy Online — Digital Rights**
+**What your appointment letter MUST contain:**
+- Full name, designation, and date of joining
+- Salary/CTC breakup (basic, HRA, allowances)
+- Probation period details and notice period
+- Job description and reporting structure
 
-The Digital Personal Data Protection Act, 2023 (DPDPA) gives you strong rights over your personal data.
+**If employer refuses appointment letter:**
+1. Send written request via email
+2. File complaint with Labour Commissioner
+3. Collect other evidence (salary slips, emails, ID card)
 
-**Your key digital privacy rights:**
-1. **Right to consent** — Companies must get your explicit consent before collecting data
-2. **Right to know** — You can ask what data a company has collected about you
-3. **Right to correction** — You can ask companies to correct inaccurate data
-4. **Right to erasure** — You can ask companies to delete your data
-5. **Right to grievance** — Every company must have a grievance officer
+**Salary slips are also your legal right** — required monthly, must show all deductions."""
 
-**What companies CANNOT do:**
-- Collect data without clear consent
-- Use data for purposes beyond what was consented to
-- Share your data with third parties without consent
-- Retain data longer than necessary
+    if "salary" in t and ("timely" in t or "payment" in t or "wages" in t):
+        return """**Right to Timely Salary — Employee Rights**
 
-**If your privacy is violated:**
-1. File complaint with the company's grievance officer first
-2. Escalate to Data Protection Board of India (once operational)
-3. For cybercrime — file at cybercrime.gov.in
-4. Cyber helpline: **1930**
+The Payment of Wages Act, 1936 guarantees your right to receive salary on time.
 
-**Practical tips:**
-- Read privacy policies before signing up
-- Review app permissions regularly
-- Use strong passwords and 2FA
-- Don't share OTPs or passwords with anyone""",
+**Legal deadlines:**
+- Companies <1,000 employees: salary by **7th of next month**
+- Companies 1,000+ employees: salary by **10th of next month**
+- Final settlement on resignation: within **2 working days**
 
-        "protection from harassment": """**Protection from Workplace Harassment — Employee Rights**
+**Authorized deductions only:** PF, ESI, TDS, agreed advance repayment.
 
-The Sexual Harassment of Women at Workplace Act, 2013 (POSH Act) protects employees from harassment.
+**If salary is delayed:**
+1. Send written reminder to HR
+2. File complaint with Payment of Wages Authority (Labour Commissioner)
+3. Can recover salary + 10x compensation for delay
 
-**What is sexual harassment at workplace:**
-- Unwelcome physical contact or advances
-- Demand or request for sexual favours
-- Sexually coloured remarks
-- Showing pornography
-- Any other unwelcome physical, verbal or non-verbal conduct of a sexual nature
+**Helpline: 1800-11-5800** (Labour Ministry)"""
 
-**Your rights under POSH Act:**
-- Every employer with 10+ employees MUST have an Internal Complaints Committee (ICC)
-- You can file complaint with ICC within 3 months of incident
-- Inquiry must be completed within 90 days
-- You can request transfer during inquiry
-- Your identity is kept confidential
+    if "notice period" in t:
+        return """**Notice Period Rights — Employee Rights**
 
-**What to do if harassed:**
-1. Document all incidents with dates, times, and witnesses
-2. File written complaint with ICC
-3. If no ICC exists — file with Local Complaints Committee (district level)
-4. Can file criminal complaint under IPC Section 354A simultaneously
+**Employee rights during notice period:**
+- Full salary must be paid throughout notice period
+- All leaves and benefits continue
+- Can negotiate early release with employer
 
-**Other workplace harassment:**
-- Bullying, victimization, discrimination are also grounds for complaint
-- File with Labour Commissioner for general workplace harassment
-- Approach National Human Rights Commission for serious violations""",
+**Payment in lieu of notice:**
+- Either party can pay salary instead of serving notice
+- Employer can ask you to leave immediately by paying notice salary
 
-        "gratuity after 5 years": """**Gratuity Rights — Employee Rights**
+**If employer terminates without notice:**
+- Entitled to full notice period salary as compensation
+- File complaint with Labour Commissioner
+
+**Wrongful termination** (for union activity, during maternity leave, for filing complaints) is illegal — approach Labour Court."""
+
+    if "gratuity" in t:
+        return """**Gratuity Rights — Employee Rights**
 
 Gratuity is a statutory payment you are entitled to after completing 5 years of continuous service.
 
@@ -967,55 +928,342 @@ Gratuity is a statutory payment you are entitled to after completing 5 years of 
 Gratuity = (Last drawn salary × 15 × Years of service) ÷ 26
 ```
 
-**Example:**
-- Last salary: ₹50,000/month
-- Service: 8 years
-- Gratuity = (50,000 × 15 × 8) ÷ 26 = **₹2,30,769**
+**Example:** Last salary ₹50,000/month × 8 years = **₹2,30,769**
 
 **Important rules:**
 - Minimum 5 years continuous service required
 - Payable on resignation, retirement, death, or disablement
-- Must be paid within 30 days of becoming payable
-- Tax-free up to ₹20 lakh (as of 2023)
-- Company cannot deny gratuity if eligible
+- Must be paid within 30 days
+- Tax-free up to ₹20 lakh
 
 **If company refuses gratuity:**
 1. Send written demand notice to employer
 2. File application before Controlling Authority (Labour Commissioner)
 3. Authority can award gratuity + 10% simple interest for delay
-4. Criminal prosecution possible for willful non-payment
+4. Criminal prosecution possible for willful non-payment"""
 
-**If you die or become disabled before 5 years:**
-Nominee/family still entitled to proportional gratuity""",
-    }
+    if "pf" in t or "esi" in t or "provident" in t:
+        return """**PF & ESI Rights — Employee Rights**
 
-    # Find best matching answer
-    for key, answer in RIGHTS_ANSWERS.items():
-        if any(word in topic for word in key.split()):
-            return answer
+**Provident Fund (EPF):**
+- Employee contribution: **12% of basic salary**
+- Employer must also contribute **12%**
+- Interest rate: **8.25% per annum** (tax-free)
+- Check balance at epfindia.gov.in or UMANG app
 
-    # If topic contains known keywords
-    if any(w in topic for w in ["tenant", "rent", "landlord", "evict", "deposit", "lease"]):
-        return _mock_legal_answer("tenant rights in india")
-    if any(w in topic for w in ["employee", "salary", "employer", "job", "work", "pf", "gratuity", "termination"]):
-        return _mock_legal_answer("employee rights india")
-    if any(w in topic for w in ["consumer", "product", "refund", "defective", "service", "ecommerce"]):
-        return _mock_legal_answer("consumer complaint india")
-    if any(w in topic for w in ["privacy", "cyber", "digital", "data", "online", "hack", "social media"]):
-        return _mock_legal_answer("cybercrime india")
+**ESI (for salary below ₹21,000/month):**
+- Covers medical treatment, hospitalization, maternity, disability
+- Employee contributes **0.75%**, employer **3.25%**
 
-    # Generic but helpful fallback for unknown rights topics
-    return f"""**{topic.title()}**
+**If employer not depositing PF/ESI:**
+1. Check passbook at epfindia.gov.in
+2. File complaint at EPFO regional office
+3. Employer liable for criminal prosecution + penalty
 
-This is an important legal right under Indian law. Here is what you need to know:
+**EPFO Helpline: 1800-118-005 (free)**"""
 
-**General legal framework:**
-Indian law provides comprehensive protections for citizens across all areas. The specific rights related to "{topic}" are governed by applicable Acts and Regulations.
+    if "maternity" in t:
+        return """**Maternity Leave Rights — Employee Rights**
+
+**Entitlement under Maternity Benefit Act, 1961 (amended 2017):**
+- First two children: **26 weeks** (6.5 months) fully paid leave
+- Third child onwards: **12 weeks** paid leave
+- Adoption (child below 3 months): **12 weeks** paid leave
+
+**Additional benefits:**
+- Work from home option after maternity leave (if nature of work permits)
+- Crèche facility (companies with 50+ employees)
+- 2 nursing breaks per day until child is 15 months
+- Cannot be terminated during maternity leave
+- Bonus and increments must be paid during leave
+
+**If employer denies maternity leave:**
+1. Send written request citing Maternity Benefit Act, 1961
+2. File complaint with Inspector under the Act
+3. Employer liable for fine up to ₹5,000 and/or 1 year jail
+
+**Helpline: 1800-11-5800** (Labour Ministry)"""
+
+    if "harassment" in t or "posh" in t or "workplace" in t:
+        return """**Protection from Workplace Harassment — Employee Rights**
+
+The Sexual Harassment of Women at Workplace Act, 2013 (POSH Act) protects all employees.
+
+**What is sexual harassment:**
+- Unwelcome physical contact or advances
+- Demand or request for sexual favours
+- Sexually coloured remarks or showing pornography
+
+**Your rights under POSH Act:**
+- Every employer with 10+ employees MUST have an Internal Complaints Committee (ICC)
+- File complaint with ICC within 3 months of incident
+- Inquiry must be completed within 90 days
+- Your identity is kept confidential
+
+**What to do if harassed:**
+1. Document all incidents with dates, times, and witnesses
+2. File written complaint with ICC
+3. Can file criminal complaint under IPC Section 354A simultaneously
+
+**For general workplace bullying/discrimination:**
+- File complaint with Labour Commissioner"""
+
+    # Consumer Rights
+    if "safety" in t and "consumer" not in t:
+        pass  # fall through to check consumer context
+    if "safety" in t or ("consumer" in t and "safe" in t):
+        return """**Right to Safety — Consumer Rights**
+
+Under the Consumer Protection Act, 2019, you have the right to protection from goods and services that are hazardous to life and property.
+
+**Your safety rights:**
+- Products must meet BIS/ISI safety standards before being sold
+- You can demand replacement or refund for unsafe products
+- Manufacturers are liable for defective products that cause harm
+- Services must be performed with reasonable care and skill
+
+**Common safety violations:**
+- Electrical appliances without ISI mark
+- Food products beyond expiry date
+- Substandard helmets, toys, LPG cylinders
+
+**How to claim compensation:**
+1. Document the defect with photos/videos
+2. Keep purchase receipt and packaging
+3. Report to manufacturer/seller first
+4. If no resolution — file at District Consumer Forum
+5. File with BIS (bis.gov.in) for substandard goods
+
+**National Consumer Helpline: 1800-11-4000 (free)**"""
+
+    if "right to information" in t or ("information" in t and "consumer" in t):
+        return """**Right to Information — Consumer Rights**
+
+You have the right to complete information about any product or service before purchasing.
+
+**What sellers must disclose:**
+- Complete price including all taxes and charges
+- Quality, quantity, and composition of goods
+- Manufacturing and expiry dates
+- Terms and conditions of service
+- Return and refund policy
+
+**For online shopping:**
+- Seller name, address, and contact must be displayed
+- Return policy must be clearly stated
+- No hidden charges — total price must be shown upfront
+
+**If information was misleading:**
+- Return the product and claim full refund
+- File complaint at consumerhelpline.gov.in
+
+**National Consumer Helpline: 1800-11-4000**"""
+
+    if "choose" in t or "choice" in t:
+        return """**Right to Choose — Consumer Rights**
+
+You have the right to choose from a variety of products and services at competitive prices.
+
+**What sellers CANNOT do:**
+- Force you to buy a specific product or brand
+- Tied selling (forcing you to buy product A to get product B)
+- Banks cannot force insurance with home loans (illegal under RBI guidelines)
+
+**If your right to choose is violated:**
+1. Refuse and demand alternative
+2. Document the conversation
+3. For banking issues — file at RBI Ombudsman (bankingombudsman.rbi.org.in)
+4. For telecom — file at TRAI (trai.gov.in)
+5. File at consumerhelpline.gov.in
+
+**National Consumer Helpline: 1800-11-4000**"""
+
+    if "heard" in t or "be heard" in t:
+        return """**Right to be Heard — Consumer Rights**
+
+Under the Consumer Protection Act, 2019, every consumer has the right to be heard at appropriate forums.
+
+**Consumer Forum system:**
+| Forum | Claims |
+|-------|--------|
+| District Consumer Forum | Up to ₹50 lakh |
+| State Consumer Commission | ₹50L to ₹2 crore |
+| National Consumer Commission | Above ₹2 crore |
+
+**How to exercise this right:**
+1. File complaint at consumerhelpline.gov.in or nearest Consumer Forum
+2. Forum must admit/reject within 21 days
+3. You have right to present evidence and witnesses
+4. No lawyer required for District Forum
+5. Decision must be given within 90-150 days
+
+**National Consumer Helpline: 1800-11-4000 (free)**"""
+
+    if "redressal" in t or "seek redressal" in t:
+        return """**Right to Seek Redressal — Consumer Rights**
+
+You have the legal right to seek fair settlement of genuine grievances.
+
+**What you can claim:**
+- Full refund of amount paid
+- Compensation for mental agony and harassment
+- Cost of litigation
+- Punitive damages for unfair trade practices
+
+**How to file Consumer Forum complaint:**
+1. Send notice to company first — 15 days to respond
+2. If no resolution — file at edaakhil.nic.in (online, free)
+3. Submit complaint with all supporting documents
+4. Forum must resolve within 90-150 days
+
+**Other redressal forums:**
+- RBI Ombudsman: banking complaints
+- IRDAI: insurance complaints
+- TRAI: telecom complaints
+- SEBI SCORES: stock market complaints
+
+**National Consumer Helpline: 1800-11-4000**"""
+
+    if "e-commerce" in t or "ecommerce" in t or "online shopping" in t:
+        return """**E-Commerce Consumer Rights in India**
+
+The Consumer Protection (E-Commerce) Rules, 2020 gives you strong rights for online shopping.
+
+**Your key rights:**
+- No hidden charges — final price = advertised price
+- Return policy must be clearly stated and honored
+- Refund must be processed within 7-10 business days of return pickup
+- Every e-commerce platform must have a grievance officer
+
+**If you receive fake/wrong product:**
+1. Take photos immediately
+2. Report to platform within return window
+3. If no resolution — file at consumerhelpline.gov.in
+4. File police complaint for fraud if significant amount
+
+**Chargeback option:**
+If no refund — dispute with your bank within 30 days for credit/debit card payments.
+
+**National Consumer Helpline: 1800-11-4000**"""
+
+    # Digital Rights
+    if "privacy" in t or "data protection" in t:
+        return """**Right to Privacy Online — Digital Rights**
+
+The Digital Personal Data Protection Act, 2023 (DPDPA) gives you strong rights over your personal data.
+
+**Your key digital privacy rights:**
+1. Companies must get your explicit consent before collecting data
+2. You can ask what data a company has collected about you
+3. You can ask companies to correct inaccurate data
+4. You can ask companies to delete your data
+5. Every company must have a grievance officer
+
+**If your privacy is violated:**
+1. File complaint with the company's grievance officer first
+2. Escalate to Data Protection Board of India
+3. File at cybercrime.gov.in for serious violations
+
+**Practical tips:**
+- Review app permissions regularly
+- Use strong passwords and 2FA
+- Never share OTPs with anyone
+
+**Cyber helpline: 1930**"""
+
+    if "data erasure" in t or "erasure" in t or "delete" in t and "data" in t:
+        return """**Right to Data Erasure — Digital Rights**
+
+The DPDPA 2023 gives you the right to have your personal data deleted.
+
+**When you can exercise this right:**
+- You withdraw consent for data processing
+- Company's purpose for data collection is fulfilled
+- You close your account on a platform
+
+**How to request data deletion:**
+1. Go to company's privacy settings or contact their privacy team
+2. Submit written request for data deletion
+3. Company must acknowledge within 72 hours
+4. Must delete within 30 days
+
+**If company refuses:**
+- Escalate to Data Protection Board
+- File complaint at cybercrime.gov.in
+
+**Cyber helpline: 1930**"""
+
+    if "cybercrime" in t or "cyber crime" in t:
+        return """**Protection from Cybercrime — Digital Rights**
+
+**Report immediately:**
+- **1930** — National Cybercrime Helpline (call within minutes for fund recovery!)
+- **cybercrime.gov.in** — file complaint online
+
+**Common cybercrimes and penalties:**
+| Crime | Punishment |
+|-------|-----------|
+| Hacking | 3 years jail + ₹5 lakh fine |
+| Identity theft | 3 years jail + ₹1 lakh fine |
+| Online fraud | 3 years jail + ₹1 lakh fine |
+| Cyberstalking | 3 years jail |
+
+**For financial fraud:** Report to 1930 AND your bank within 24 hours — money can often be frozen and recovered!
+
+**Cyber helpline: 1930**"""
+
+    if "fake news" in t or "defamation" in t:
+        return """**Right Against Fake News & Defamation — Digital Rights**
+
+**Laws that protect you:**
+- IPC Section 499/500: Criminal defamation — 2 years jail
+- IT Act: Sending offensive/defamatory messages online
+
+**If someone spreads fake news about you:**
+1. Screenshot everything with timestamps
+2. Report to the platform (removal within 24-48 hours)
+3. Send legal notice to the person
+4. File police complaint for defamation
+5. File civil suit for damages
+
+**For fake news/misinformation:**
+- Report to PIB Fact Check: pib.gov.in/factcheck
+- Report to cybercrime.gov.in
+
+**Cyber helpline: 1930**"""
+
+    if "social media" in t:
+        return """**Social Media Account Protection — Digital Rights**
+
+**If your account is hacked:**
+1. Try account recovery immediately (email/phone backup)
+2. Report to the platform for account recovery
+3. Alert contacts NOT to respond to messages from hacked account
+4. File complaint at cybercrime.gov.in
+
+**If someone creates fake profile of you:**
+- Report to platform for impersonation (removed within 24-48 hours)
+- File complaint under IT Act Section 66D (impersonation — 3 years jail)
+
+**Protect your accounts:**
+- Enable 2-Factor Authentication (2FA) — most important step
+- Use strong unique passwords
+- Never share OTPs or login credentials
+- Check active sessions regularly
+
+**Platform must remove harmful content within 36 hours** of complaint (IT Rules 2021).
+
+**Cyber helpline: 1930**"""
+
+    # Generic helpful fallback
+    return f"""**{topic.title()} — Your Legal Rights in India**
+
+This is an important legal right under Indian law.
 
 **Your key protections:**
 - You have the right to fair treatment under Indian law
-- Violations of your rights can be reported to appropriate authorities
-- Free legal aid is available if you cannot afford a lawyer
+- Violations can be reported to appropriate authorities
+- Free legal aid is available through NALSA
 
 **How to enforce this right:**
 1. Document any violation with evidence (photos, messages, receipts)
@@ -1024,9 +1272,7 @@ Indian law provides comprehensive protections for citizens across all areas. The
 4. Contact NALSA helpline **15100** for free legal guidance
 
 **Free resources:**
-- NALSA Helpline: 15100
-- National Consumer Helpline: 1800-11-4000
-- Cybercrime: 1930
-- ecourts.gov.in for court-related matters
-
-Would you like me to explain any specific aspect of this right in more detail?"""
+- NALSA Helpline: **15100**
+- National Consumer Helpline: **1800-11-4000**
+- Cybercrime: **1930**
+- ecourts.gov.in for court matters"""

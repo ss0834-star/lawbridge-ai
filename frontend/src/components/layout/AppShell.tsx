@@ -17,7 +17,7 @@ const TABS: Record<string, { label: string; tabs: { href: string; label: string 
   '/dashboard': { label: 'Legal Desk', tabs: [] },
   '/upload': { label: 'Upload Document', tabs: [] },
   '/analysis': { label: 'Documents', tabs: [{ href: '/analysis', label: 'All Documents' }] },
-  '/chat': { label: 'Ask LawBridge', tabs: [{ href: '/chat', label: 'Document Chat' }, { href: '/chat/general', label: 'General Legal Q&A' }] },
+  '/chat': { label: 'Ask LawBridge', tabs: [{ href: '/chat?mode=general', label: 'General Legal Q&A' }, { href: '/chat?mode=document', label: 'Document Chat' }] },
   '/rights': { label: 'Know Your Rights', tabs: [] },
   '/location': { label: 'Legal Help Near Me', tabs: [] },
 };
