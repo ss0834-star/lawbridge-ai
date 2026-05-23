@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import AppShell from '@/components/layout/AppShell';
 import { locationApi } from '@/lib/api';
-import { MapPin, Phone, Globe, Navigation, AlertTriangle, Building, Locate, CheckCircle } from 'lucide-react';
+import { MapPin, Phone, Globe, Navigation, AlertTriangle, Building, Locate, Star } from 'lucide-react';
 import { DOC_TYPES } from '@/lib/utils';
 
 export default function LocationPage() {
@@ -12,6 +12,7 @@ export default function LocationPage() {
   const [resources, setResources] = useState<any[]>([]);
   const [checklist, setChecklist] = useState<string[]>([]);
   const [nearest, setNearest] = useState<any[]>([]);
+  const [places, setPlaces] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState('');
@@ -21,18 +22,22 @@ export default function LocationPage() {
 
   const detectLocation = () => {
     if (!navigator.geolocation) { setGpsError('GPS not supported on this device'); return; }
-    setGpsLoading(true); setGpsError(''); setGpsUsed(false);
+    setGpsLoading(true); setGpsError(''); setGpsUsed(false); setPlaces([]);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
           const { latitude: lat, longitude: lon } = pos.coords;
-          const res = await locationApi.nearest(lat, lon);
-          setNearest(res.data.nearest || []);
+          const [nearestRes, placesRes] = await Promise.all([
+            locationApi.nearest(lat, lon),
+            locationApi.placesNearby(lat, lon)
+          ]);
+          setNearest(nearestRes.data.nearest || []);
+          setPlaces(placesRes.data.places || []);
           setGpsUsed(true);
-        } catch { setGpsError('Could not fetch nearest centers. Try manual search.'); }
+        } catch { setGpsError('Could not fetch nearby centers. Try manual search.'); }
         finally { setGpsLoading(false); }
       },
-      (err) => { setGpsError('Location access denied. Please allow location or use manual search.'); setGpsLoading(false); }
+      () => { setGpsError('Location access denied. Please allow location or use manual search.'); setGpsLoading(false); }
     );
   };
 
@@ -57,22 +62,24 @@ export default function LocationPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <div>
               <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--navy)' }}>📍 Find Nearest Legal Aid Center</p>
-              <p style={{ fontSize: 12, color: 'rgba(20,33,61,0.55)', marginTop: 2 }}>Uses your live GPS to find the closest DLSA to you</p>
+              <p style={{ fontSize: 12, color: 'rgba(20,33,61,0.55)', marginTop: 2 }}>Uses your live GPS to find closest legal help</p>
             </div>
             <button onClick={detectLocation} disabled={gpsLoading} className="btn-navy" style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
               <Locate size={14} /> {gpsLoading ? 'Detecting...' : 'Use My Location'}
             </button>
           </div>
           {gpsError && <p style={{ fontSize: 12, color: '#dc2626', marginTop: 8 }}>⚠️ {gpsError}</p>}
+
           {gpsUsed && nearest.length > 0 && (
-            <div style={{ marginTop: 12 }}>
-              <p style={{ fontSize: 12, fontWeight: 600, color: 'rgba(20,33,61,0.5)', marginBottom: 8 }}>NEAREST LEGAL AID CENTERS</p>
+            <div style={{ marginTop: 16 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(20,33,61,0.4)', letterSpacing: 1, marginBottom: 10 }}>🏛️ NEAREST GOVERNMENT LEGAL AID (DLSA)</p>
               {nearest.map((n, i) => (
                 <div key={i} style={{ padding: '14px', border: '1px solid rgba(201,162,39,0.3)', borderRadius: 10, marginBottom: 10, background: i === 0 ? '#fffbeb' : 'white' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                         {i === 0 && <span style={{ fontSize: 10, padding: '2px 8px', background: '#f0fdf4', color: '#16834A', border: '1px solid #86efac', borderRadius: 10, fontWeight: 700 }}>NEAREST</span>}
+                        <span style={{ fontSize: 10, padding: '2px 8px', background: '#f0fdf4', color: '#16834A', border: '1px solid #86efac', borderRadius: 10, fontWeight: 700 }}>FREE</span>
                         <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--navy)' }}>{n.dlsa}</p>
                       </div>
                       <p style={{ fontSize: 12, color: 'rgba(20,33,61,0.6)', marginBottom: 4 }}>{n.address}</p>
@@ -91,6 +98,39 @@ export default function LocationPage() {
                       <Navigation size={11} /> Get Directions
                     </a>
                     <a href={n.maps_url} target="_blank" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'rgba(20,33,61,0.08)', borderRadius: 8, color: 'var(--navy)', textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>
+                      <MapPin size={11} /> View on Map
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {gpsUsed && places.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(20,33,61,0.4)', letterSpacing: 1, marginBottom: 10 }}>⚖️ NEARBY LAWYERS & LEGAL OFFICES (via Google)</p>
+              {places.map((p, i) => (
+                <div key={i} style={{ padding: '14px', border: '1px solid rgba(20,33,61,0.1)', borderRadius: 10, marginBottom: 10, background: 'white' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--navy)' }}>{p.name}</p>
+                        {p.open_now === true && <span style={{ fontSize: 10, padding: '2px 8px', background: '#f0fdf4', color: '#16834A', border: '1px solid #86efac', borderRadius: 10, fontWeight: 700 }}>OPEN NOW</span>}
+                        {p.open_now === false && <span style={{ fontSize: 10, padding: '2px 8px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 10, fontWeight: 700 }}>CLOSED</span>}
+                      </div>
+                      {p.address && <p style={{ fontSize: 12, color: 'rgba(20,33,61,0.6)', marginBottom: 4 }}>{p.address}</p>}
+                      {p.rating && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#D97706' }}>
+                          <Star size={11} fill="#D97706" /> <span style={{ fontWeight: 600 }}>{p.rating}</span> <span style={{ color: 'rgba(20,33,61,0.4)' }}>/ 5</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                    <a href={p.directions_url} target="_blank" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'var(--navy)', borderRadius: 8, color: 'white', textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>
+                      <Navigation size={11} /> Get Directions
+                    </a>
+                    <a href={p.maps_url} target="_blank" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'rgba(20,33,61,0.08)', borderRadius: 8, color: 'var(--navy)', textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>
                       <MapPin size={11} /> View on Map
                     </a>
                   </div>
@@ -125,9 +165,7 @@ export default function LocationPage() {
 
         {checklist.length > 0 && (
           <div className="legal-card" style={{ padding: 20, marginBottom: 16, borderLeft: '4px solid var(--gold)' }}>
-            <h3 className="font-serif" style={{ fontSize: 18, fontWeight: 700, color: 'var(--navy)', marginBottom: 12 }}>
-              {state} — {docType} Checklist
-            </h3>
+            <h3 className="font-serif" style={{ fontSize: 18, fontWeight: 700, color: 'var(--navy)', marginBottom: 12 }}>{state} — {docType} Checklist</h3>
             {checklist.map((item, i) => (
               <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 10, padding: '10px 14px', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 8 }}>
                 <AlertTriangle size={13} style={{ color: '#D97706', flexShrink: 0, marginTop: 1 }} />

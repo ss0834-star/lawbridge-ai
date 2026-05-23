@@ -114,3 +114,42 @@ from app.services.district_service import get_nearest_dlsa
 def nearest_dlsa(lat: float, lon: float, limit: int = 3, user: User = Depends(auth_required)):
     results = get_nearest_dlsa(lat, lon, limit)
     return {"nearest": results, "count": len(results)}
+
+
+# ── Google Places Nearby Legal Aid ────────────────────────────────────────────
+import httpx
+import os
+
+@location_router.get("/places-nearby")
+async def places_nearby(lat: float, lon: float, user: User = Depends(auth_required)):
+    api_key = os.environ.get("GOOGLE_PLACES_API_KEY")
+    if not api_key:
+        return {"places": [], "error": "Places API not configured"}
+    try:
+        url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+        params = {
+            "location": f"{lat},{lon}",
+            "radius": 5000,
+            "keyword": "legal aid lawyer advocate court",
+            "type": "lawyer",
+            "key": api_key
+        }
+        async with httpx.AsyncClient(timeout=10) as client:
+            res = await client.get(url, params=params)
+            data = res.json()
+        places = []
+        for p in data.get("results", [])[:5]:
+            places.append({
+                "name": p.get("name"),
+                "address": p.get("vicinity"),
+                "rating": p.get("rating"),
+                "open_now": p.get("opening_hours", {}).get("open_now"),
+                "lat": p["geometry"]["location"]["lat"],
+                "lon": p["geometry"]["location"]["lng"],
+                "place_id": p.get("place_id"),
+                "directions_url": f"https://www.google.com/maps/dir/?api=1&destination={p['geometry']['location']['lat']},{p['geometry']['location']['lng']}&destination_place_id={p.get('place_id')}",
+                "maps_url": f"https://www.google.com/maps/place/?q=place_id:{p.get('place_id')}"
+            })
+        return {"places": places, "count": len(places)}
+    except Exception as e:
+        return {"places": [], "error": str(e)}
