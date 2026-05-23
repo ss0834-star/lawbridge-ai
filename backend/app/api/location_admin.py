@@ -33,11 +33,8 @@ def get_resources(state: Optional[str] = None, db: Session = Depends(get_db), us
     if not state:
         loc = db.query(LocationProfile).filter(LocationProfile.user_id == user.id).first()
         state = loc.state if loc else None
-    resources = db.query(LegalAidResource).filter(LegalAidResource.state == state).all() if state else []
-    if not resources:
-        resources = db.query(LegalAidResource).all()[:3]
-    return [{"id": r.id, "name": r.name, "resource_type": r.resource_type, "city": r.city, "state": r.state,
-             "address": r.address, "phone": r.phone, "website": r.website, "description": r.description, "is_free": r.is_free} for r in resources]
+    resources = get_resources_by_state(state) if state else [r for r in LEGAL_AID_DATA if "NALSA" in r["name"]]
+    return [{"id": i + 1, **r} for i, r in enumerate(resources)]
 
 @location_router.get("/checklist")
 def get_loc_checklist(state: str, document_type: str = "Rental Agreement", user: User = Depends(auth_required)):
@@ -51,9 +48,6 @@ def list_states():
 def my_location(db: Session = Depends(get_db), user: User = Depends(auth_required)):
     loc = db.query(LocationProfile).filter(LocationProfile.user_id == user.id).first()
     return {"city": loc.city if loc else "", "state": loc.state if loc else "", "set": loc is not None}
-
-
-# ── Know Your Rights ──────────────────────────────────────────────────────────
 
 @rights_router.get("/categories")
 def rights_categories():
@@ -69,9 +63,6 @@ def get_rights(category: str, user: User = Depends(auth_required)):
     data = KNOW_YOUR_RIGHTS.get(category)
     if not data: raise HTTPException(404, "Category not found")
     return data
-
-
-# ── Admin ─────────────────────────────────────────────────────────────────────
 
 def require_admin(user: User = Depends(auth_required)):
     if user.role != "admin": raise HTTPException(403, "Admin access required")
