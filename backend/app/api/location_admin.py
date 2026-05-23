@@ -153,3 +153,41 @@ async def places_nearby(lat: float, lon: float, user: User = Depends(auth_requir
         return {"places": places, "count": len(places)}
     except Exception as e:
         return {"places": [], "error": str(e)}
+
+
+# ── Google Places Nearby Legal Aid v2 ────────────────────────────────────────
+@location_router.get("/places-nearby-v2")
+async def places_nearby_v2(lat: float, lon: float, user: User = Depends(auth_required)):
+    api_key = os.environ.get("GOOGLE_PLACES_API_KEY")
+    if not api_key:
+        return {"places": [], "error": "Places API not configured"}
+    try:
+        url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+        params = {
+            "location": f"{lat},{lon}",
+            "radius": 10000,
+            "keyword": "advocate lawyer legal",
+            "key": api_key
+        }
+        async with httpx.AsyncClient(timeout=15) as client:
+            res = await client.get(url, params=params)
+            data = res.json()
+        if data.get("status") != "OK":
+            return {"places": [], "error": data.get("status"), "message": data.get("error_message", "")}
+        places = []
+        for p in data.get("results", [])[:6]:
+            places.append({
+                "name": p.get("name"),
+                "address": p.get("vicinity"),
+                "rating": p.get("rating"),
+                "total_ratings": p.get("user_ratings_total"),
+                "open_now": p.get("opening_hours", {}).get("open_now"),
+                "lat": p["geometry"]["location"]["lat"],
+                "lon": p["geometry"]["location"]["lng"],
+                "place_id": p.get("place_id"),
+                "directions_url": f"https://www.google.com/maps/dir/?api=1&destination={p['geometry']['location']['lat']},{p['geometry']['location']['lng']}",
+                "maps_url": f"https://www.google.com/maps/place/?q=place_id:{p.get('place_id')}"
+            })
+        return {"places": places, "count": len(places), "status": data.get("status")}
+    except Exception as e:
+        return {"places": [], "error": str(e)}
