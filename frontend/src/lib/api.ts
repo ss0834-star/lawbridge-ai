@@ -53,7 +53,7 @@ export const locationApi = {
   states: () => api.get('/location/states'),
   my: () => api.get('/location/my'),
   nearest: (lat: number, lon: number) => api.get('/location/nearest', { params: { lat, lon } }),
-  placesNearby: (lat: number, lon: number) => api.get('/location/places-nearby-v2', { params: { lat, lon } }),
+  placesNearby: (lat: number, lon: number) => api.get('/location/places-nearby-new', { params: { lat, lon } }),
 };
 export const rightsApi = {
   categories: () => api.get('/rights/categories'),
