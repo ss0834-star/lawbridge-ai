@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import AppShell from '@/components/layout/AppShell';
 import { locationApi } from '@/lib/api';
-import { MapPin, Phone, Globe, Scale, CheckCircle, AlertTriangle, Building } from 'lucide-react';
+import { MapPin, Phone, Globe, Navigation, AlertTriangle, Building, Locate, CheckCircle } from 'lucide-react';
 import { DOC_TYPES } from '@/lib/utils';
 
 export default function LocationPage() {
@@ -11,9 +11,30 @@ export default function LocationPage() {
   const [docType, setDocType] = useState('Rental Agreement');
   const [resources, setResources] = useState<any[]>([]);
   const [checklist, setChecklist] = useState<string[]>([]);
+  const [nearest, setNearest] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [gpsError, setGpsError] = useState('');
+  const [gpsUsed, setGpsUsed] = useState(false);
 
   useEffect(() => { locationApi.states().then(r => setStates(r.data.states)); }, []);
+
+  const detectLocation = () => {
+    if (!navigator.geolocation) { setGpsError('GPS not supported on this device'); return; }
+    setGpsLoading(true); setGpsError(''); setGpsUsed(false);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude: lat, longitude: lon } = pos.coords;
+          const res = await locationApi.nearest(lat, lon);
+          setNearest(res.data.nearest || []);
+          setGpsUsed(true);
+        } catch { setGpsError('Could not fetch nearest centers. Try manual search.'); }
+        finally { setGpsLoading(false); }
+      },
+      (err) => { setGpsError('Location access denied. Please allow location or use manual search.'); setGpsLoading(false); }
+    );
+  };
 
   const search = async () => {
     if (!state) return;
@@ -29,9 +50,59 @@ export default function LocationPage() {
     <AppShell>
       <div style={{ maxWidth: 900, animation: 'fadeUp 0.4s ease-out' }}>
         <h1 className="font-serif" style={{ fontSize: 26, fontWeight: 700, color: 'var(--navy)', marginBottom: 4 }}>Legal Help Near Me</h1>
-        <p style={{ fontSize: 13, color: 'rgba(20,33,61,0.55)', marginBottom: 20 }}>Find free legal aid and state-specific requirements for your documents</p>
+        <p style={{ fontSize: 13, color: 'rgba(20,33,61,0.55)', marginBottom: 20 }}>Find the nearest legal aid center to your exact location</p>
 
+        {/* GPS CARD */}
+        <div className="legal-card" style={{ padding: 20, marginBottom: 16, borderLeft: '4px solid var(--gold)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div>
+              <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--navy)' }}>📍 Find Nearest Legal Aid Center</p>
+              <p style={{ fontSize: 12, color: 'rgba(20,33,61,0.55)', marginTop: 2 }}>Uses your live GPS to find the closest DLSA to you</p>
+            </div>
+            <button onClick={detectLocation} disabled={gpsLoading} className="btn-navy" style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+              <Locate size={14} /> {gpsLoading ? 'Detecting...' : 'Use My Location'}
+            </button>
+          </div>
+          {gpsError && <p style={{ fontSize: 12, color: '#dc2626', marginTop: 8 }}>⚠️ {gpsError}</p>}
+          {gpsUsed && nearest.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <p style={{ fontSize: 12, fontWeight: 600, color: 'rgba(20,33,61,0.5)', marginBottom: 8 }}>NEAREST LEGAL AID CENTERS</p>
+              {nearest.map((n, i) => (
+                <div key={i} style={{ padding: '14px', border: '1px solid rgba(201,162,39,0.3)', borderRadius: 10, marginBottom: 10, background: i === 0 ? '#fffbeb' : 'white' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        {i === 0 && <span style={{ fontSize: 10, padding: '2px 8px', background: '#f0fdf4', color: '#16834A', border: '1px solid #86efac', borderRadius: 10, fontWeight: 700 }}>NEAREST</span>}
+                        <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--navy)' }}>{n.dlsa}</p>
+                      </div>
+                      <p style={{ fontSize: 12, color: 'rgba(20,33,61,0.6)', marginBottom: 4 }}>{n.address}</p>
+                      <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'rgba(20,33,61,0.5)', flexWrap: 'wrap' }}>
+                        {n.phone && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Phone size={10} />{n.phone}</span>}
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><MapPin size={10} />{n.district}, {n.state}</span>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
+                      <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--gold)' }}>{n.distance_km} km</p>
+                      <p style={{ fontSize: 10, color: 'rgba(20,33,61,0.4)' }}>from you</p>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                    <a href={n.directions_url} target="_blank" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'var(--navy)', borderRadius: 8, color: 'white', textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>
+                      <Navigation size={11} /> Get Directions
+                    </a>
+                    <a href={n.maps_url} target="_blank" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'rgba(20,33,61,0.08)', borderRadius: 8, color: 'var(--navy)', textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>
+                      <MapPin size={11} /> View on Map
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* MANUAL SEARCH */}
         <div className="legal-card" style={{ padding: 20, marginBottom: 16 }}>
+          <p style={{ fontSize: 13, fontWeight: 600, color: 'rgba(20,33,61,0.5)', marginBottom: 12 }}>OR SEARCH BY STATE & DOCUMENT TYPE</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 12, alignItems: 'end' }}>
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'rgba(20,33,61,0.6)', marginBottom: 6 }}>Your State</label>
@@ -68,9 +139,9 @@ export default function LocationPage() {
 
         {resources.length > 0 && (
           <div className="legal-card" style={{ padding: 20, marginBottom: 16 }}>
-            <h3 className="font-serif" style={{ fontSize: 18, fontWeight: 700, color: 'var(--navy)', marginBottom: 16 }}>Free Legal Aid Resources</h3>
-            {resources.map((r: any) => (
-              <div key={r.id} style={{ padding: '16px', border: '1px solid rgba(201,162,39,0.2)', borderRadius: 10, marginBottom: 10, display: 'flex', gap: 14 }}>
+            <h3 className="font-serif" style={{ fontSize: 18, fontWeight: 700, color: 'var(--navy)', marginBottom: 16 }}>State Legal Aid Resources</h3>
+            {resources.map((r: any, i: number) => (
+              <div key={i} style={{ padding: '16px', border: '1px solid rgba(201,162,39,0.2)', borderRadius: 10, marginBottom: 10, display: 'flex', gap: 14 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Building size={16} style={{ color: 'var(--gold)' }} />
                 </div>

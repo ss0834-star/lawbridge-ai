@@ -105,3 +105,12 @@ def health(db: Session = Depends(get_db), user: User = Depends(require_admin)):
 def audit_logs(db: Session = Depends(get_db), user: User = Depends(require_admin)):
     logs = db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(50).all()
     return [{"id": l.id, "user_id": l.user_id, "action": l.action, "resource_type": l.resource_type, "created_at": l.created_at.isoformat()} for l in logs]
+
+
+# ── Nearest DLSA by GPS ───────────────────────────────────────────────────────
+from app.services.district_service import get_nearest_dlsa
+
+@location_router.get("/nearest")
+def nearest_dlsa(lat: float, lon: float, limit: int = 3, user: User = Depends(auth_required)):
+    results = get_nearest_dlsa(lat, lon, limit)
+    return {"nearest": results, "count": len(results)}

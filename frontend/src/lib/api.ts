@@ -52,6 +52,7 @@ export const locationApi = {
   checklist: (state: string, docType: string) => api.get('/location/checklist', { params: { state, document_type: docType } }),
   states: () => api.get('/location/states'),
   my: () => api.get('/location/my'),
+  nearest: (lat: number, lon: number) => api.get('/location/nearest', { params: { lat, lon } }),
 };
 export const rightsApi = {
   categories: () => api.get('/rights/categories'),
