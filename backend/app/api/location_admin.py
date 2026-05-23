@@ -191,3 +191,52 @@ async def places_nearby_v2(lat: float, lon: float, user: User = Depends(auth_req
         return {"places": places, "count": len(places), "status": data.get("status")}
     except Exception as e:
         return {"places": [], "error": str(e)}
+
+
+# ── Google Places NEW API ─────────────────────────────────────────────────────
+@location_router.get("/places-nearby-new")
+async def places_nearby_new(lat: float, lon: float, user: User = Depends(auth_required)):
+    api_key = os.environ.get("GOOGLE_PLACES_API_KEY")
+    if not api_key:
+        return {"places": [], "error": "Places API not configured"}
+    try:
+        url = "https://places.googleapis.com/v1/places:searchNearby"
+        headers = {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": api_key,
+            "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.currentOpeningHours,places.location,places.id,places.nationalPhoneNumber"
+        }
+        body = {
+            "includedTypes": ["lawyer"],
+            "maxResultCount": 6,
+            "locationRestriction": {
+                "circle": {
+                    "center": {"latitude": lat, "longitude": lon},
+                    "radius": 10000.0
+                }
+            }
+        }
+        async with httpx.AsyncClient(timeout=15) as client:
+            res = await client.post(url, json=body, headers=headers)
+            data = res.json()
+        if "error" in data:
+            return {"places": [], "error": data["error"].get("message", "Unknown error")}
+        places = []
+        for p in data.get("places", []):
+            loc = p.get("location", {})
+            plat = loc.get("latitude", lat)
+            plon = loc.get("longitude", lon)
+            places.append({
+                "name": p.get("displayName", {}).get("text", "Unknown"),
+                "address": p.get("formattedAddress", ""),
+                "rating": p.get("rating"),
+                "total_ratings": p.get("userRatingCount"),
+                "phone": p.get("nationalPhoneNumber"),
+                "open_now": p.get("currentOpeningHours", {}).get("openNow"),
+                "place_id": p.get("id"),
+                "directions_url": f"https://www.google.com/maps/dir/?api=1&destination={plat},{plon}",
+                "maps_url": f"https://www.google.com/maps/place/?q=place_id:{p.get('id')}"
+            })
+        return {"places": places, "count": len(places)}
+    except Exception as e:
+        return {"places": [], "error": str(e)}
